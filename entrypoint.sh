@@ -1,6 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-service sshd start
+
+echo "Starting ssh service..."
+/usr/sbin/sshd
+
+rc=$?
+if [[ $rc != 0 ]]; then
+  echo "Failed to start ssh servier! return code: $rc. exit($rc)"
+  exec $rc
+else
+  echo "Start sshd service successfully"
+fi
 
 cleanup() {
   kill -s SIGTERM $!                                                         
@@ -21,18 +31,20 @@ while sleep 10; do
 
   index=0
   for hd in "${hadoopDaemons[@]}" 
-  do 
-    echo "INFO: start to scan daemon [$hd]"
+  do
     ps aux |grep -v grep |grep $hd -q 
     DAEMON_STATUS=$?
     if [ $DAEMON_STATUS -ne 0 ]; then
       echo "INFO: Hadoop daemon [$hd] is not running..."
-      # If the hadoop deamon thread is not found and and the container runs such daemon before,
+      # If the spark deamon is lost and FAIL_FAST is true
       # then we consider an error occurred and exit!
       for rd in "${runingDaemons[@]}"; do
       if [[ "$rd" == "$hd" ]]; then
-        echo "ERROR: Hadoop daemon [$hd] is lost, exit(1)"
-        exit 1
+        echo "ERROR: Hadoop daemon [$hd] is lost"
+        if [[ "$FAIL_FAST" == "true" ]]; then
+          echo "FAIL_FAST is enabled, exit(1)"
+          exit 1
+        fi
       fi
       done
     else
